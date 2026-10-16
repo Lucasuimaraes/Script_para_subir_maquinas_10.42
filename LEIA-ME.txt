@@ -33,6 +33,12 @@ Execute como usuário normal do Mint, sem sudo.
 - Confira o plano e digite exatamente `CONFIGURAR` para começar.
 - Aguarde a reinicialização e a validação. O script informará `SUCESSO` quando terminar.
 
+APÓS A CONFIGURAÇÃO DA REDE
+Depois que o IP novo e o gateway forem confirmados, o instalador também baixa/atualiza e instala `teste_saude_ssd` do GitHub e executa a validação em modo consulta, sem carga proposital de CPU/RAM, memtester ou benchmarks. O terminal do Mint mostra a execução de cada máquina. Antes do diagnóstico, confira a lista de discos SATA inteiros e informe um ou mais discos (`/dev/sda`, `/dev/sdb`, etc.).
+
+Os relatórios `DIAGNOSTICO.txt`, `RESUMO.txt` e `RELATORIO_COMPLETO.txt` são copiados para `~/Relatorios-validacao-servidor/<execução>/<IP>/`. O script tenta abrir o diagnóstico na interface gráfica do Mint. Os relatórios são locais e não são enviados ao GitHub. Código 1 indica pendências/falhas a revisar, não falha da mudança de IP.
+
+
 REDE
 Faixa: 10.42.0.200 a 10.42.0.254/24
 Gateway: 10.42.0.1
