@@ -1,3 +1,13 @@
+INSTALAÇÃO AUTOMÁTICA (Linux Mint)
+
+Copie e cole este comando no Terminal, como usuário normal e a partir de qualquer pasta. Ele instala os requisitos, baixa/atualiza o projeto e abre o instalador interativo. Não use sudo antes do comando:
+
+python3 -c 'import os, subprocess, tempfile, urllib.request; url="https://raw.githubusercontent.com/Lucasuimaraes/Script_para_subir_maquinas_10.42/main/instalar.sh"; f=tempfile.NamedTemporaryFile(prefix="ironvox-", suffix=".sh", delete=False); f.write(urllib.request.urlopen(url, timeout=30).read()); f.close(); result=subprocess.run(["bash", f.name]).returncode; os.unlink(f.name); raise SystemExit(result)'
+
+O restante deste arquivo descreve a instalação manual caso você esteja usando o ZIP.
+
+========================================================================
+
 SCRIPT PARA SUBIR MÁQUINAS — REDE 10.42
 
 Este pacote configura de 1 a 2 máquinas Debian 11 para a rede 10.42.0.0/24, instala os pacotes do manual, ajusta aliases e interface e reinicia para aplicar a configuração.
