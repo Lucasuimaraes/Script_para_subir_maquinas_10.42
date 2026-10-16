@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Instalador interativo IRONVOX para Linux Mint. Executar como usuário normal."""
-import concurrent.futures, getpass, hashlib, base64, ipaddress, json, pathlib, shlex, socket, subprocess, sys, time
+import concurrent.futures, getpass, hashlib, base64, ipaddress, json, os, pathlib, re, shlex, shutil, socket, subprocess, sys, time
 try:
     import paramiko
 except ImportError:
@@ -88,6 +88,93 @@ def responds(ip):
     return False
 
 
+def select_health_disks(client):
+    print('Discos detectados na máquina:')
+    execute(client, 'lsblk -d -o NAME,MODEL,SIZE,TYPE', echo=True, timeout=30)
+    raw_disks = execute(client, 'lsblk -dnpo NAME,TYPE', timeout=30)
+    available = []
+    for line in raw_disks.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] == 'disk' and re.fullmatch(r'/dev/sd[a-z]+', parts[0]):
+            available.append(parts[0])
+    if not available:
+        raise RuntimeError('Nenhum disco SATA inteiro /dev/sdX foi detectado; não iniciei a validação.')
+    default = '/dev/sda' if '/dev/sda' in available else ''
+    print('Discos SATA disponíveis para o teste:', ', '.join(available))
+    while True:
+        prompt = 'Discos inteiros para validar, separados por espaço'
+        if default:
+            prompt += f' [Enter usa {default}]'
+        value = input(prompt + ': ').strip()
+        disks = value.replace(',', ' ').split() if value else ([default] if default else [])
+        if disks and len(disks) == len(set(disks)) and all(disk in available for disk in disks):
+            return disks
+        print('Informe um ou mais discos da lista, por exemplo: /dev/sda /dev/sdb')
+
+
+def validate_server_health(ip, password, key, report_root):
+    print(f'\n=== Validação de saúde em {ip} (modo consulta, sem stress) ===', flush=True)
+    client = None
+    try:
+        client = connect(ip, password, key)
+        setup = '''set -eu
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y git ca-certificates python3
+if [ -d /opt/teste_saude_ssd/.git ]; then
+    git -C /opt/teste_saude_ssd pull --ff-only
+elif [ -e /opt/teste_saude_ssd ]; then
+    echo 'ERRO: /opt/teste_saude_ssd existe, mas não é um clone Git; revise antes de continuar.' >&2
+    exit 1
+else
+    git clone --branch master https://github.com/Lucasuimaraes/teste_saude_ssd.git /opt/teste_saude_ssd
+fi
+bash /opt/teste_saude_ssd/validacao-servidor/instalar.sh
+validar-servidor --instalar-dependencias
+validar-servidor --versao
+'''
+        execute(client, setup, echo=True, timeout=3600)
+        disks = select_health_disks(client)
+        args = ' '.join('--disco ' + shlex.quote(disk) for disk in disks)
+        command = ('set +e; validar-servidor --modo consulta --perfil auto ' + args +
+                   '; result=$?; printf "\nIRONVOX_VALIDATION_EXIT=%s\n" "$result"; exit 0')
+        output = execute(client, command, echo=True, timeout=3600)
+        match = re.search(r'(?m)^IRONVOX_VALIDATION_EXIT=(\d+)$', output)
+        if not match:
+            raise RuntimeError('A validação não retornou o código final esperado.')
+        result_code = int(match.group(1))
+        report_match = re.search(r'(?m)^Relatórios salvos em:\s*(\S+)\s*$', output)
+        if not report_match:
+            raise RuntimeError('A validação não informou a pasta dos relatórios.')
+        remote_dir = report_match.group(1)
+        local_dir = report_root / ip
+        local_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        local_dir.chmod(0o700)
+        saved = []
+        with client.open_sftp() as sftp:
+            for filename in ('DIAGNOSTICO.txt', 'RESUMO.txt', 'RELATORIO_COMPLETO.txt'):
+                remote_file = remote_dir + '/' + filename
+                local_file = local_dir / filename
+                sftp.get(remote_file, str(local_file))
+                local_file.chmod(0o600)
+                saved.append(local_file)
+        diagnosis = local_dir / 'DIAGNOSTICO.txt'
+        if result_code == 0:
+            print(f'Validação concluída sem alertas automáticos em {ip}; ainda exige revisão técnica.')
+        elif result_code == 1:
+            print(f'Validação em {ip} encontrou pendências/falhas para revisão; relatórios copiados.')
+        else:
+            print(f'Validação em {ip} terminou com código {result_code}; confira o relatório/inconclusão.')
+        for path in saved:
+            print('Relatório local:', path)
+        return {'ip': ip, 'code': result_code, 'diagnosis': diagnosis}
+    except Exception as exc:
+        print(f'FALHA na validação de saúde de {ip}: {exc}', file=sys.stderr)
+        return {'ip': ip, 'code': None, 'diagnosis': None}
+    finally:
+        if client is not None:
+            client.close()
+
+
 def main():
     if not (BASE / 'ironvox-remoto.py').exists():
         raise RuntimeError('Mantenha ironvox-remoto.py na mesma pasta deste arquivo.')
@@ -125,10 +212,13 @@ def main():
     for old, new in zip(ips, destinations):
         print(f'  {old} → {new}/24, interface eth1, gateway 10.42.0.1')
     print('O script instalará pacotes, alterará aliases, GRUB e rede, e reiniciará cada máquina.')
+    print('Após validar o novo IP, instalará o verificador teste_saude_ssd e rodará o modo consulta (sem stress). Os relatórios serão copiados para o Mint.')
     if input('Os IPs estão reservados fora do DHCP e posso aplicar? Digite CONFIGURAR: ').strip() != 'CONFIGURAR':
         print('Cancelado sem acessar as máquinas.')
         return
     completed = []
+    health_results = []
+    report_root = pathlib.Path.home() / 'Relatorios-validacao-servidor' / time.strftime('%Y%m%d-%H%M%S')
     for old, new in zip(ips, destinations):
         print(f'\n=== Configurando {old} → {new} ===', flush=True)
         c = connect(old, password)
@@ -187,9 +277,21 @@ def main():
             time.sleep(5)
         if not success:
             raise RuntimeError(f'Não foi possível validar {new}: {last_error}\nA recuperação tentará restaurar a rede anterior aos 5 minutos de boot.\nAguarde o segundo reboot e tente o IP anterior {old}. Se era DHCP, consulte a nova concessão ou o console.\nAs demais máquinas não serão alteradas. Concluídas: {completed}')
+        health_results.append(validate_server_health(new, password, key, report_root))
     print('\nConcluído. Acesso pelo terminal do Mint:')
     for ip in completed:
         print('  ssh root@' + ip)
+    if health_results:
+        print('\nRelatórios de saúde no Mint:')
+        for result in health_results:
+            if result['diagnosis']:
+                print('  ' + str(result['diagnosis']))
+        if os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
+            if shutil.which('xdg-open'):
+                for result in health_results:
+                    if result['diagnosis']:
+                        subprocess.Popen(['xdg-open', str(result['diagnosis'])], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                print('Abrindo os diagnósticos na interface gráfica do Mint.')
 
 if __name__ == '__main__':
     try:
