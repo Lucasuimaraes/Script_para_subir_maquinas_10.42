@@ -1,57 +1,22 @@
-INSTALAÇÃO AUTOMÁTICA (Linux Mint)
+SUBIR MÁQUINAS DEBIAN 11 — REDE 10.42
 
-Copie e cole este comando no Terminal, como usuário normal e a partir de qualquer pasta. Ele instala os requisitos, baixa/atualiza o projeto e abre o instalador interativo. Não use sudo antes do comando:
+INSTALAÇÃO DIRETA PELO GITHUB
 
-python3 -c 'import os, subprocess, tempfile, urllib.request; url="https://raw.githubusercontent.com/Lucasuimaraes/Script_para_subir_maquinas_10.42/main/instalar.sh"; f=tempfile.NamedTemporaryFile(prefix="ironvox-", suffix=".sh", delete=False); f.write(urllib.request.urlopen(url, timeout=30).read()); f.close(); result=subprocess.run(["bash", f.name]).returncode; os.unlink(f.name); raise SystemExit(result)'
+1. Abra o Terminal do Linux Mint.
+2. Copie e cole este comando completo. Não use sudo:
 
-O restante deste arquivo descreve a instalação manual caso você esteja usando o ZIP.
+python3 -c "import urllib.request as u; open('/tmp/ironvox-10.42.sh','wb').write(u.urlopen('https://raw.githubusercontent.com/Lucasuimaraes/Script_para_subir_maquinas_10.42/main/instalar.sh').read())" && (x-terminal-emulator -e bash /tmp/ironvox-10.42.sh || bash /tmp/ironvox-10.42.sh)
 
-========================================================================
+O comando baixa o instalador, abre uma nova janela de Terminal e inicia as perguntas. Não precisa extrair arquivos nem procurar a pasta Downloads. Na nova janela aparecerá:
 
-SCRIPT PARA SUBIR MÁQUINAS — REDE 10.42
+Quantas máquinas deseja configurar? [1 ou 2]:
 
-Este pacote configura de 1 a 2 máquinas Debian 11 para a rede 10.42.0.0/24, instala os pacotes do manual, ajusta aliases e interface e reinicia para aplicar a configuração.
+O instalador solicitará sua senha sudo para instalar dependências. Em seguida, informe a quantidade (1 ou 2), os IPs atuais das máquinas e a senha root quando solicitada. Confirme e reserve os IPs finais no DHCP/inventário antes de prosseguir; a sondagem por ping não garante que estejam livres.
 
-1. EXTRAIA E LOCALIZE O SCRIPT
-- No gerenciador de arquivos, abra Downloads, clique com o botão direito no ZIP e escolha “Extrair aqui”.
-- Será criada a pasta `Script_para_subir_maquinas_10.42`.
-- Abra o Terminal. Ele pode iniciar em `/home/implantacao` ou em outra pasta; nesse caso, entre na pasta extraída com:
-  cd ~/Downloads/Script_para_subir_maquinas_10.42
-- Confira se os arquivos estão ali:
-  ls
-  Devem aparecer `subir-maquinas.py`, `ironvox-remoto.py` e `LEIA-ME.txt`.
+Depois de aplicar a rede, o programa tenta acessar cada máquina pelo IP novo e executa a validação de saúde em modo consulta. O progresso aparece no Terminal. Os relatórios ficam em:
 
-Se extraiu o ZIP em outra pasta, localize o script com:
-  find ~ -type f -name 'subir-maquinas.py' 2>/dev/null
-Entre na pasta que contém o resultado. Por exemplo, se o caminho mostrado for `/home/implantacao/Área de Trabalho/Script_para_subir_maquinas_10.42/subir-maquinas.py`, rode:
-  cd "/home/implantacao/Área de Trabalho/Script_para_subir_maquinas_10.42"
-Mantenha `subir-maquinas.py` e `ironvox-remoto.py` juntos na mesma pasta.
+~/Relatorios-validacao-servidor/
 
-2. INSTALE OS REQUISITOS NO LINUX MINT (UMA ÚNICA VEZ)
-  sudo apt update
-  sudo apt install -y python3-paramiko iputils-ping
+O programa não realiza testes intencionais de carga nem envia relatórios ao GitHub.
 
-3. EXECUTE O SCRIPT
-Já dentro da pasta que contém os arquivos, rode:
-  python3 subir-maquinas.py
-Execute como usuário normal do Mint, sem sudo.
-
-4. SIGA AS PERGUNTAS DO INSTALADOR
-- Informe a quantidade de máquinas (1 ou 2), o IP atual de cada uma e a senha root quando solicitada. A senha não é salva pelo script.
-- Se aparecer a confirmação da chave SSH, confira a máquina e digite `ACEITAR`.
-- O script sondará os IPs 10.42.0.200 a 10.42.0.254. Escolha os IPs finais somente depois de confirmar e reservá-los no DHCP/inventário. A sondagem mostra quem não respondeu; ela não garante que o IP esteja livre.
-- Confira o plano e digite exatamente `CONFIGURAR` para começar.
-- Aguarde a reinicialização e a validação. O script informará `SUCESSO` quando terminar.
-
-APÓS A CONFIGURAÇÃO DA REDE
-Depois que o IP novo e o gateway forem confirmados, o instalador também baixa/atualiza e instala `teste_saude_ssd` do GitHub e executa a validação em modo consulta, sem carga proposital de CPU/RAM, memtester ou benchmarks. O terminal do Mint mostra a execução de cada máquina. Antes do diagnóstico, confira a lista de discos SATA inteiros e informe um ou mais discos (`/dev/sda`, `/dev/sdb`, etc.).
-
-Os relatórios `DIAGNOSTICO.txt`, `RESUMO.txt` e `RELATORIO_COMPLETO.txt` são copiados para `~/Relatorios-validacao-servidor/<execução>/<IP>/`. O script tenta abrir o diagnóstico na interface gráfica do Mint. Os relatórios são locais e não são enviados ao GitHub. Código 1 indica pendências/falhas a revisar, não falha da mudança de IP.
-
-
-REDE
-Faixa: 10.42.0.200 a 10.42.0.254/24
-Gateway: 10.42.0.1
-Interface: eth1
-
-Se a validação falhar, não execute novamente às cegas. Aguarde alguns minutos para a recuperação automática e tente o IP anterior.
+O projeto é mantido em ~/.local/share/ironvox/Script_para_subir_maquinas_10.42 e as próximas execuções atualizam os arquivos do Git automaticamente.
