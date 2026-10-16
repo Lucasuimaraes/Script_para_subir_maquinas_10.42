@@ -15,5 +15,6 @@ Quantas máquinas deseja configurar? [1 ou 2]:
 Depois, informe o IP atual de cada Debian, a senha root quando solicitada e escolha IPs finais que estejam reservados para essas máquinas. A lista de IPs sem resposta não garante que estejam livres.
 
 Após mudar a rede e confirmar acesso pelos novos IPs, o programa também executa a validação de saúde em modo consulta, mostra a execução no Terminal e salva os relatórios em `~/Relatorios-validacao-servidor/`. A validação não realiza testes de carga.
+Ao terminar os testes, o programa abre uma janela de Terminal conectada como root para cada máquina configurada. Se forem duas, abre duas janelas.
 
 O projeto fica instalado em `~/.local/share/ironvox/Script_para_subir_maquinas_10.42` e será atualizado automaticamente nas próximas execuções.
