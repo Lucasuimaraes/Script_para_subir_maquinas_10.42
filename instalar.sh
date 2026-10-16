@@ -36,11 +36,7 @@ if [[ -d $INSTALL_DIR/.git ]]; then
     fi
 fi
 
-printf 'Instalando dependências do Linux Mint...\n'
-if ! sudo apt-get update; then
-    printf '\nAVISO: o apt-get update retornou erro em uma ou mais fontes.\n' >&2
-    printf 'Vou tentar instalar os requisitos com os índices disponíveis; falhas aqui precisam ser corrigidas antes de continuar.\n\n' >&2
-fi
+printf 'Instalando dependências necessárias (sem atualizar as fontes do APT)...\n'
 sudo apt-get install -y git ca-certificates python3 python3-paramiko iputils-ping
 
 mkdir -p "$(dirname -- "$INSTALL_DIR")"
