@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Instalador interativo IRONVOX para Linux Mint. Executar como usuário normal."""
-import concurrent.futures, getpass, hashlib, base64, ipaddress, json, os, pathlib, re, shlex, shutil, socket, subprocess, sys, time
+import concurrent.futures, getpass, hashlib, base64, ipaddress, json, os, pathlib, re, shlex, shutil, socket, subprocess, sys, tempfile, time
 try:
     import paramiko
 except ImportError:
@@ -175,6 +175,53 @@ validar-servidor --versao
             client.close()
 
 
+def open_ssh_terminal(ip, password, key):
+    launcher = shutil.which('x-terminal-emulator')
+    if not launcher or not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+        print(f'Não foi possível abrir um terminal gráfico para {ip}; conecte manualmente com: ssh root@{ip}')
+        return
+
+    ssh_dir = pathlib.Path.home() / '.ssh'
+    ssh_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    ssh_dir.chmod(0o700)
+    known_hosts = ssh_dir / 'known_hosts'
+    host_keys = paramiko.HostKeys()
+    if known_hosts.exists():
+        host_keys.load(str(known_hosts))
+    host_keys.add(ip, key.get_name(), key)
+    host_keys.save(str(known_hosts))
+    known_hosts.chmod(0o600)
+
+    secret_dir = pathlib.Path(tempfile.mkdtemp(prefix='ironvox-ssh-'))
+    password_file = secret_dir / 'password'
+    askpass = secret_dir / 'askpass'
+    password_file.write_text(password)
+    password_file.chmod(0o600)
+    askpass.write_text('#!/bin/sh\n[ -r "$IRONVOX_PASSWORD_FILE" ] || exit 1\ncat "$IRONVOX_PASSWORD_FILE"\nrm -f -- "$IRONVOX_PASSWORD_FILE"\n')
+    askpass.chmod(0o700)
+
+    q = shlex.quote
+    cleanup = f'rm -f -- {q(str(password_file))} {q(str(askpass))}; rmdir -- {q(str(secret_dir))} 2>/dev/null || true'
+    ssh_command = (
+        f'export SSH_ASKPASS={q(str(askpass))} SSH_ASKPASS_REQUIRE=force IRONVOX_PASSWORD_FILE={q(str(password_file))}; '
+        f'trap {q(cleanup)} EXIT HUP INT TERM; '
+        f'ssh -tt -o StrictHostKeyChecking=yes -o UserKnownHostsFile={q(str(known_hosts))} '
+        f'-o PubkeyAuthentication=no -o PreferredAuthentications=keyboard-interactive,password root@{q(ip)}; '
+        'status=$?; printf "\nConexão SSH encerrada. "; '
+        'read -r -p "Pressione Enter para fechar esta janela..." _; exit "$status"'
+    )
+    try:
+        subprocess.Popen([launcher, '-e', 'bash', '-c', ssh_command],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        print(f'Terminal aberto para {ip} (SSH como root).')
+    except OSError as exc:
+        password_file.unlink(missing_ok=True)
+        askpass.unlink(missing_ok=True)
+        secret_dir.rmdir()
+        print(f'Não consegui abrir o terminal para {ip}: {exc}. Use: ssh root@{ip}')
+
+
 def main():
     if not (BASE / 'ironvox-remoto.py').exists():
         raise RuntimeError('Mantenha ironvox-remoto.py na mesma pasta deste arquivo.')
@@ -190,7 +237,7 @@ def main():
             ips.append(ip)
         else:
             print('IP repetido.')
-    password = getpass.getpass('Senha root das máquinas (não será gravada): ')
+    password = getpass.getpass('Senha root das máquinas (usada só nesta execução): ')
     print('Sondando 10.42.0.200–254 a partir do Mint...')
     pool = [f'10.42.0.{n}' for n in range(200, 255)]
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
@@ -218,6 +265,7 @@ def main():
         return
     completed = []
     health_results = []
+    verified_keys = {}
     report_root = pathlib.Path.home() / 'Relatorios-validacao-servidor' / time.strftime('%Y%m%d-%H%M%S')
     for old, new in zip(ips, destinations):
         print(f'\n=== Configurando {old} → {new} ===', flush=True)
@@ -266,6 +314,7 @@ def main():
                 execute(client, 'systemctl disable --now ironvox-rollback.service && rm /etc/systemd/system/ironvox-rollback.service && systemctl daemon-reload', timeout=30)
                 print(f'SUCESSO: {new} — SSH, MAC, IP, gateway e resolução DNS verificados.')
                 completed.append(new)
+                verified_keys[new] = key
                 success = True
                 break
             except Exception as exc:
@@ -291,6 +340,10 @@ def main():
                     if result['diagnosis']:
                         subprocess.Popen(['xdg-open', str(result['diagnosis'])], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 print('Abrindo os diagnósticos na interface gráfica do Mint.')
+    if completed:
+        print('Abrindo um terminal SSH para cada máquina configurada...')
+        for ip in completed:
+            open_ssh_terminal(ip, password, verified_keys[ip])
 
 if __name__ == '__main__':
     try:
