@@ -1,0 +1,41 @@
+SCRIPT PARA SUBIR MÁQUINAS — REDE 10.42
+
+Este pacote configura de 1 a 2 máquinas Debian 11 para a rede 10.42.0.0/24, instala os pacotes do manual, ajusta aliases e interface e reinicia para aplicar a configuração.
+
+1. EXTRAIA E LOCALIZE O SCRIPT
+- No gerenciador de arquivos, abra Downloads, clique com o botão direito no ZIP e escolha “Extrair aqui”.
+- Será criada a pasta `Script_para_subir_maquinas_10.42`.
+- Abra o Terminal. Ele pode iniciar em `/home/implantacao` ou em outra pasta; nesse caso, entre na pasta extraída com:
+  cd ~/Downloads/Script_para_subir_maquinas_10.42
+- Confira se os arquivos estão ali:
+  ls
+  Devem aparecer `subir-maquinas.py`, `ironvox-remoto.py` e `LEIA-ME.txt`.
+
+Se extraiu o ZIP em outra pasta, localize o script com:
+  find ~ -type f -name 'subir-maquinas.py' 2>/dev/null
+Entre na pasta que contém o resultado. Por exemplo, se o caminho mostrado for `/home/implantacao/Área de Trabalho/Script_para_subir_maquinas_10.42/subir-maquinas.py`, rode:
+  cd "/home/implantacao/Área de Trabalho/Script_para_subir_maquinas_10.42"
+Mantenha `subir-maquinas.py` e `ironvox-remoto.py` juntos na mesma pasta.
+
+2. INSTALE OS REQUISITOS NO LINUX MINT (UMA ÚNICA VEZ)
+  sudo apt update
+  sudo apt install -y python3-paramiko iputils-ping
+
+3. EXECUTE O SCRIPT
+Já dentro da pasta que contém os arquivos, rode:
+  python3 subir-maquinas.py
+Execute como usuário normal do Mint, sem sudo.
+
+4. SIGA AS PERGUNTAS DO INSTALADOR
+- Informe a quantidade de máquinas (1 ou 2), o IP atual de cada uma e a senha root quando solicitada. A senha não é salva pelo script.
+- Se aparecer a confirmação da chave SSH, confira a máquina e digite `ACEITAR`.
+- O script sondará os IPs 10.42.0.200 a 10.42.0.254. Escolha os IPs finais somente depois de confirmar e reservá-los no DHCP/inventário. A sondagem mostra quem não respondeu; ela não garante que o IP esteja livre.
+- Confira o plano e digite exatamente `CONFIGURAR` para começar.
+- Aguarde a reinicialização e a validação. O script informará `SUCESSO` quando terminar.
+
+REDE
+Faixa: 10.42.0.200 a 10.42.0.254/24
+Gateway: 10.42.0.1
+Interface: eth1
+
+Se a validação falhar, não execute novamente às cegas. Aguarde alguns minutos para a recuperação automática e tente o IP anterior.
