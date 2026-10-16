@@ -18,5 +18,6 @@ Depois de aplicar a rede, o programa tenta acessar cada máquina pelo IP novo e 
 ~/Relatorios-validacao-servidor/
 
 O programa não realiza testes intencionais de carga nem envia relatórios ao GitHub.
+Ao terminar os testes de saúde, ele abre uma janela de Terminal conectada como root para cada máquina configurada. Para duas máquinas, abre duas janelas.
 
 O projeto é mantido em ~/.local/share/ironvox/Script_para_subir_maquinas_10.42 e as próximas execuções atualizam os arquivos do Git automaticamente.
