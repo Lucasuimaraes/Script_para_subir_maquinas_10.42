@@ -241,8 +241,7 @@ def main():
             execute(c, 'systemd-run --unit=ironvox-reboot --on-active=3s /sbin/reboot')
         finally:
             c.close()
-        print('Reinicialização agendada. Aguardando 60 segundos...', flush=True)
-        time.sleep(60)
+        print('Reinicialização agendada. Verificando o novo IP...', flush=True)
         deadline = time.monotonic() + 170
         success = False
         last_error = ''
